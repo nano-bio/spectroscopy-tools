@@ -1,6 +1,8 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
+*.py~
+*.m~
 
 # C extensions
 *.so
@@ -12,6 +14,7 @@ build/
 develop-eggs/
 dist/
 downloads/
+download/
 eggs/
 .eggs/
 lib/
@@ -55,3 +58,11 @@ docs/_build/
 
 # PyBuilder
 target/
+
+# lots of file used here
+*.txt
+*.h5
+!1000 Buffer Template.h5
+!2600 Buffer Template.h5
+*.txt~
+wl-files/
