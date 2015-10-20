@@ -5,10 +5,10 @@ import os
 
 # filename to look at
 wavemeter_dir = 'wl-files'
-tof_file_list = 'filelist_864nm.txt'
+tof_file_list = 'filelist_bereich_3_2_fine_960nm.txt'
 
 # output file to write to
-output_file = 'output_864nm.txt'
+output_file = 'output_bereich_3_2_fine_960nm.txt'
 
 # timespan over which should be averaged
 averaging_time = 60
@@ -51,6 +51,7 @@ for tof_file in tof_fh:
                 linecounter = 0
                 averagecounter = 0
                 wl_sum = 0
+                printcounter = 0
 
                 for line in fh:
                     values = wl_regex.match(line)
@@ -63,12 +64,17 @@ for tof_file in tof_fh:
                         if int(time)-averagecounter*averaging_time*1000 > averaging_time*1000:
                             averagecounter = averagecounter + 1
                             output_fh.write(str(wl_sum/linecounter) + '\r\n')
+                            printcounter = printcounter + 1
                             linecounter = 0
                             wl_sum = 0
 
                         # count the line and sum up the wavelength
                         wl_sum = wl_sum + float(wl.replace(',', '.'))
                         linecounter = linecounter + 1
+                while printcounter < 10:
+                    output_fh.write(str(wl_sum/linecounter) + '\r\n')
+                    print('repeated last value, because otherwise there would only be 9 values: ' + wl_file)
+                    printcounter = printcounter + 1
 
                 fh.close()
         if found_wl_file is False:
