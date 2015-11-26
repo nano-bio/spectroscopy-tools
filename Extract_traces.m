@@ -2,147 +2,183 @@
 
 %IFD file calibration: LOAD H5 WITHOUT INTERNAL CALIBRATION!!!!
 
+%==========================================================================
+%========================== USER PARAMETERS ===============================
+%==========================================================================
 %IsotopeFit Path:
 addpath('Z:\Experiments\STM\matlab\IsotopeFit\');
 
 %folder
-folder='Z:\Temp\rALSER\';
+folder='F:\Laserdaten\new\';
 
 %IFD files:
 IFD_file=[];
-IFD_file{1}=[folder,'Bereich 3 fein 1 960nm.ifd'];
-IFD_file{2}=[folder,'Bereich 3 Abschnitt 2 fein 960nm.ifd'];
+IFD_file{1}=[folder,'958,00 to 965,00 0,05nm steps 1 Buff per step 215mW.ifd'];
+%IFD_file{2}=[folder,'Bereich 3 Abschnitt 2 fein 960nm.ifd'];
 
 %H5 files:
 H5_file=[];
-H5_file{1}=[folder,'Bereich 3 fein 1 960nm.h5'];
-H5_file{2}=[folder,'Bereich 3 Abschnitt 2 fein 960nm.h5'];
+H5_file{1}=[folder,'958,00 to 965,00 0,05nm steps 1 Buff per step 215mW.h5'];
+%H5_file{2}=[folder,'Bereich 3 Abschnitt 2 fein 960nm.h5'];
 
 %Wavelength files
 lambda_file=[];
-lambda_file{1}=[folder,'Bereich 3 fein 1 960nm - Wellenlaengen.txt'];
-lambda_file{2}=[folder,'Bereich 3 Abschnitt 2 fein 960nm - Wellenlaengen.txt'];
-
+lambda_file{1}=[folder,'lambda3.txt'];
+%lambda_file{2}=[folder,'Bereich 3 Abschnitt 2 fein 960nm - Wellenlaengen.txt'];
 
 %Export filename
-scan_filename=[folder,'Bereich 3 fein ENERGIES_He100.txt'];
+scan_filename=[folder,'Bereich 3 fein ENERGIES_test.txt'];
 
 %List of molecules:
 n_He=1:100; %number of C60-Helium traces to extract
 
-%searchrange (for scaling)
-sr=10; %look sr au above/below the current molecule
+%-------------------- Evaluation PARAMETERS
+sr=1.5; %look sr sigma above/below the current molecule
+mindist=0.05; %in nm, the minimum distance where points are combined
 
+
+%==========================================================================
+%======================= NOW THE MAGIC STARTS =============================
+%==========================================================================
 
 molecules=[];
-he_series=[];
-for i=1:length(n_He)
-    if n_He(i)==1
+for i=n_He
+    if i==1
         molecules{i}='[C60][He]';
     else
-        molecules{i}=sprintf('[C60][He]%i',n_He(i));
+        molecules{i}=sprintf('[C60][He]%i',i);
     end
-    he_series{i}=sprintf('[He]%i',n_He(i)+180);
 end
 
-if length(molecules)~=length(he_series)
-    fprintf('PANIC!!! Not all molecules found! I abort!\n');
-    break
-end
+
+% read all wavelength and sort them
+% remember the files and the bin numbers!
 
 energy_axis=[];
-n_bufs=[];
-sort_idx={};
+bufs=[];
+filenum=[];
 for i=1:length(lambda_file)
     temp=load(lambda_file{i});
-    [temp,sort_idx{i}]=sort(temp);
-    n_bufs(i)=length(temp);
+    bufs=[bufs 1:length(temp)];
+    filenum=[filenum i*ones(1,length(temp))];
     energy_axis=[energy_axis;temp];
 end
 
-ES_mat=zeros(length(energy_axis),length(molecules));
+[energy_axis,idx]=sort(energy_axis);
+filenum=filenum(idx);
+bufs=bufs(idx);
 
-position=1;
+%find wavelengths which can be combined
+indices={};
+[eg,~,egerr,~,indices]=approx_data(energy_axis,zeros(size(energy_axis)),mindist);
 
-%write title line
+%write title line to output ASCII file
 fid=fopen(scan_filename,'w');
-fprintf(fid,'Energy\t');
+fprintf(fid,'Energy\tError');
 
 for i=1:length(molecules)
-    fprintf(fid,'%s\t',molecules{i});
+    fprintf(fid,'\t%s\tError',molecules{i});
 end
 
 fprintf(fid,'\n');
 fclose(fid);
 
+%reference spec and IFD Data
+IFD_data={};
+massrange=[];
+
+
 for f=1:length(IFD_file)
     data={};
     load(IFD_file{f},'-mat');
-    
-    %find the indices of the molecules of interest
-    index=find(ismember({data.molecules.name},molecules));
-    index_he=find(ismember({data.molecules.name},he_series));
-    
-    %n_writes=getnumberofinstancesinh5(H5_file{f},'writes')
-    %n_bufs=getnumberofinstancesinh5(H5_file{f},'buffers')
-           
+          
     data.peakdata=subtractmassoffset(data.raw_peakdata,data.calibration);
+    
+    IFD_data{f}=data; 
     
     %load the reference sum spectrum?
     if f==1
-         ref_peakdata=data.peakdata;
-         ref_cal=data.calibration;
-         %minmass=min([data.molecules(index).minmass])-sr;
-         %maxmass=max([data.molecules(index).maxmass])+sr;
-         minmass=750;
-         maxmass=1200;
-         
-    end
-    
-    %scale the buffers: which indices?
-    ref_ind_buf=mass2ind(data.peakdata(:,1),minmass):mass2ind(data.peakdata(:,1),maxmass);
-    
-    %where is the data in the reference spec?
-    ref_ind=mass2ind(ref_peakdata(:,1),minmass):mass2ind(ref_peakdata(:,1),minmass)+length(ref_ind_buf)-1; %make sure the two ranges have the same length
+        %find the molecule indices
+        molecule_index=find(ismember({IFD_data{1}.molecules.name},molecules));
         
-    %scaling: dont look at the peaks which are affected by the laser
-    for i=1:length(index)
-        R=resolutionbycalibration(ref_cal,data.molecules(index(i)).com);
-        [ref_ind_buf,ix]=setdiff(ref_ind_buf,findmassrange2(data.peakdata(:,1)',data.molecules(index(i)),R,0,1));
-        ref_ind=ref_ind(ix);
+        %find the part of the spectrum to look at
+        minmass=min([IFD_data{1}.molecules(molecule_index).minmass])-5
+        maxmass=max([IFD_data{1}.molecules(molecule_index).maxmass])+5
+        
+        plot_bin_length=mass2ind(data.peakdata(:,1),maxmass)-mass2ind(data.peakdata(:,1),minmass);
+        ref_peakdata=data.peakdata(mass2ind(data.peakdata(:,1),minmass):mass2ind(data.peakdata(:,1),minmass)+plot_bin_length-1,:);
+        
+        [bgm,bgy, ~, ~]=find_bg(ref_peakdata(:,1),ref_peakdata(:,2),50,20,minmass,maxmass);
+        
+        %bgm=data.bgcorrectiondata.bgm;
+        %bgy=data.bgcorrectiondata.bgy;
+        
+        %minmass=min([data.molecules(index).minmass])-sr;
+        %maxmass=max([data.molecules(index).maxmass])+sr;
     end
-    
-    %for w=1:n_writes
-    w=1;
-    plot_spec=[];
-        for b=sort_idx{f}'
-            single_spec=readh5buffer(H5_file{f}, w, b);
-            if mod(position,10)==0, fprintf('%f %%\n',100*position/length(energy_axis)); end;
-            
-            %find the scaling factor
-            %design matrix for scaling: (constant baseline, linear baseline,
-            %data)
-            M=[ones(length(ref_ind_buf),1),data.peakdata(ref_ind_buf,1),single_spec(ref_ind_buf)'];
-            %find the scaling factor
-            a=M\ref_peakdata(ref_ind,2); %such that M*a is close to the reference spec in the msd sense
-            
-            %scale the data
-            single_spec=[ones(length(single_spec),1),data.peakdata(:,1),single_spec']*a;
-            
-            for i=1:length(index)
-                %a=single_spec(ref_ind_buf)'\ref_peakdata(ref_ind,2);
-                
-                R=resolutionbycalibration(ref_cal,data.molecules(index(i)).com);
-                                
-                %ES_mat(position,i)=sum(a*single_spec(small_ind));
-                ES_mat(position,i)=sum(single_spec(findmassrange2(data.peakdata(:,1)',data.molecules(index(i)),R,0,0.5)));
-            end
-            position=position+1;
-        end
-    %end
-   
+    massrange(f,:)=mass2ind(data.peakdata(:,1),minmass):mass2ind(data.peakdata(:,1),minmass)+plot_bin_length-1;
 end
- %write ASCII file
-    fprintf('dlmwrite. please wait...');
-    dlmwrite(scan_filename,[energy_axis,ES_mat],'-append','delimiter','\t','precision','%e');
-    fprintf(' done.\n');
+
+
+%only look at the first two C60He peaks
+for i=molecule_index
+    IFD_data{1}.molecules(i).peakdata=IFD_data{1}.molecules(i).peakdata(1:2,:);
+    IFD_data{1}.molecules(i).maxmass=IFD_data{1}.molecules(i).peakdata(2,1);
+end
+
+%we have only one write per h5 file!!
+w=1;
+
+%initialize the output matrix
+output_data=zeros(length(eg),(1+length(molecule_index))*2);
+output_data(:,1)=eg';
+output_data(:,2)=egerr';
+
+%extract traces for every wavelength
+for i=1:length(eg); %go through all the energy groups
+    fprintf('%f %%\n',100*i/length(eg));
+    %sum up the signal of all bufs that belong to the current wavelength
+    single_spec=zeros(1,plot_bin_length);
+    for s=indices{i}
+        temp=readh5buffer(H5_file{filenum(s)}, w, bufs(s));
+        single_spec=single_spec+temp(massrange(filenum(s),:));
+    end
+              
+    %design matrix for scaling: (constant baseline, linear baseline,data)
+    M=[ones(plot_bin_length,1),ref_peakdata(:,1),single_spec'];
+    
+    %go through all the molecules
+    for m=1:length(molecule_index)
+        R=resolutionbycalibration(IFD_data{1}.calibration,IFD_data{1}.molecules(molecule_index(m)).com);
+        
+        scale_ind=findmassrange(ref_peakdata(:,1),IFD_data{1}.molecules(molecule_index(m)),R,0,sr);
+        small_ind=findmassrange2(ref_peakdata(:,1),IFD_data{1}.molecules(molecule_index(m)),R,0,sr);
+        
+        diff_ind=setdiff(scale_ind,small_ind);
+                
+        
+        %find the scaling factor
+        %a=M(diff_ind,:)\ref_peakdata(diff_ind,2); %such that M*a is close to the reference spec in the msd sense
+        
+        % apply background correction
+        %single_spec=M*a-pchip(bgm,bgy,ref_peakdata(:,1));
+        
+        if m==8
+            plot(ref_peakdata(small_ind,1),single_spec(small_ind),'r.',ref_peakdata(diff_ind,1),single_spec(diff_ind),'k.');
+            %set(gca,'ylim',[0,2.5e5]);
+            title(IFD_data{1}.molecules(molecule_index(m)).name)
+            pause(0.1)
+            sum(single_spec(small_ind));
+        end
+        
+        output_data(i,(m+1)*2-1) = sum(single_spec(small_ind))/sum(single_spec(diff_ind));
+        output_data(i,(m+1)*2)   = sqrt(1/sum(single_spec(small_ind))+1/sum(single_spec(diff_ind)))*output_data(i,(m+1)*2-1);
+        
+        %output_data(i,(m+1)*2)   = output_data(i,(m+1)*2-1)/sqrt(sum(M(small_ind,3)));
+    end
+end
+
+fprintf('dlmwrite. please wait...');
+    dlmwrite(scan_filename,output_data,'-append','delimiter','\t','precision','%e');
+fprintf(' done.\n');
+
