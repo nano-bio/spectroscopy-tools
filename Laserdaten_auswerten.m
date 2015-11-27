@@ -1,5 +1,7 @@
 function Laserdaten_auswerten(nplot)
-A=importdata('F:\Laserdaten\new\Bereich 3 fein ENERGIES_test.txt','\t',1);
+folder='F:\Laserdaten\new\';
+
+A=importdata([folder,'Bereich 3 fein ENERGIES_test.txt'],'\t',1);
 
 xs=A.data(:,1);
 xse=A.data(:,2);
@@ -10,6 +12,7 @@ yse=A.data(:,4:2:end);
 
 ys=(ys-repmat(min(ys),size(ys,1),1))./(repmat(max(ys)-min(ys),size(ys,1),1));
 
+names=A.textdata(3:2:end);
 
 %==========================================
 %plot the fit for C60(He)n
@@ -19,10 +22,13 @@ end
 
 %==========================================
 
-output_resonances='resonances.txt';
+output_resonances=[folder,'resonances.txt'];
+output_fit=[folder,'fit_data.txt'];
 
 %Points used to fit the linear function:
 linfitpoints=setdiff([1:30],[1,5,4,23,30]);
+
+x_fit=linspace(min(xs),max(xs),100);
 
 fun_l=@(x,xd) x(1)+xd*x(5)+x(4)/pi*(x(2))./((xd-x(3)).^2+(x(2))^2); %lorenz
 fun_g=@(x,xd) x(1)+xd*x(5)+x(4)*normpdf(xd,x(3),abs(x(2))); %gauss
@@ -43,6 +49,10 @@ wkerr=0;
 rsquared=0;
 
 l=size(ys,2);
+
+paramstoplot0=zeros(l,5);
+paramstoplot=zeros(l,5);
+
 for i=1:l
     
     [~,minind]=min(smooth(ys(:,i),10));
@@ -60,11 +70,9 @@ for i=1:l
     werr(i)=err(2);
     
     fprintf('%i\tR² = %f\n',i,rsquared(i));
-    if i==nplot
-        paramstoplot0=x0;
-        paramstoplot=x;
-    end
-    
+
+    paramstoplot0(i,:)=x0;
+    paramstoplot(i,:)=x;
     
 end
 
@@ -100,10 +108,24 @@ hold off
 %     linspace(min(xdata),max(xdata),100),fun(paramstoplot0,linspace(min(xdata),max(xdata),100)),'g--',...
 %     xdata,ydata(:,nplot),'k.',xs,ys,'r.');
 
-plot(linspace(min(xs),max(xs),100),fun(paramstoplot,linspace(min(xs),max(xs),100)),'k-',...
-    linspace(min(xs),max(xs),100),fun(paramstoplot0,linspace(min(xs),max(xs),100)),'g--',...
+plot(x_fit,fun(paramstoplot(nplot,:),x_fit),'k-',...
+    x_fit,fun(paramstoplot0(nplot,:),x_fit),'g--',...
     xs, ys(:,nplot),'k.');
 hold on
+
+%write fit data
+fid=fopen(output_fit,'w');
+fprintf(fid,'wavelength');
+M=zeros(length(x_fit),length(names));
+for i=1:l
+    fprintf(fid,'\t%s',names{i});   
+    M(:,i)=fun(paramstoplot(i,:),x_fit)';
+end
+fprintf(fid,'\n');
+fclose(fid);
+dlmwrite(output_fit,[x_fit',M],'-append','delimiter','\t','precision','%e');
+fprintf('Fit data written to %s\n',output_fit);
+
 
 plotmatx=[xs-xse,xs+xse]';
 plotmaty=[ys(:,nplot),ys(:,nplot)]';
