@@ -1,7 +1,7 @@
 function Laserdaten_auswerten(nplot)
-folder='F:\Laserdaten\new\';
+folder='Z:\User\Josi\Messungen\C60He+ Spektroskopie\30.11.2015 Labbook ID 4129\';
 
-A=importdata([folder,'Bereich 3 fein ENERGIES_test.txt'],'\t',1);
+A=importdata([folder,'export.txt'],'\t',1);
 
 xs=A.data(:,1);
 xse=A.data(:,2);
@@ -57,23 +57,25 @@ for i=1:l
     
     [~,minind]=min(smooth(ys(:,i),10));
     x0(3)=xs(minind); %reset peak center start postion to the data minimum
+    if any(isnan(ys(:,i))) == 0
+        [x,R,~,CovB] = nlinfit(xs,ys(:,i),fun,x0,'Weights',1./yse(:,i));
         
-    [x,R,~,CovB] = nlinfit(xs,ys(:,i),fun,x0,'Weights',1./yse(:,i));
-        
-    err=2*sqrt(diag(CovB));
-    
-    rsquared(i)=r2(ys(:,i),fun(x,xs),1./yse(:,i));
-    peak(i)=x(3);
-    w(i)=x(2);    
-    peakerr(i)=err(3);
-    
-    werr(i)=err(2);
-    
-    fprintf('%i\tR² = %f\n',i,rsquared(i));
+        err=2*sqrt(diag(CovB));
 
-    paramstoplot0(i,:)=x0;
-    paramstoplot(i,:)=x;
-    
+        rsquared(i)=r2(ys(:,i),fun(x,xs),1./yse(:,i));
+        peak(i)=x(3);
+        w(i)=x(2);    
+        peakerr(i)=err(3);
+
+        werr(i)=err(2);
+
+        fprintf('%i\tR² = %f\n',i,rsquared(i));
+
+        paramstoplot0(i,:)=x0;
+        paramstoplot(i,:)=x;
+    else
+        fprintf('%i was not a number\n',i);
+    end
 end
 
 %write output data
