@@ -10,7 +10,11 @@ xse=A.data(:,2);
 ys=A.data(:,3:2:end);
 yse=A.data(:,4:2:end);
 
-ys=(ys-repmat(min(ys),size(ys,1),1))./(repmat(max(ys)-min(ys),size(ys,1),1));
+ysmax=max(ys);
+ysmin=min(ys);
+
+ys=(ys-repmat(ysmin,size(ys,1),1))./(repmat(ysmax-ysmin,size(ys,1),1));
+yse=yse./(repmat(ysmax-ysmin,size(yse,1),1));
 
 names=A.textdata(3:2:end);
 
@@ -25,6 +29,7 @@ end
 output_resonances=[folder,'resonances.txt'];
 output_fit=[folder,'fit_data.txt'];
 output_fitparams=[folder,'fit_parameters.txt'];
+output_data=[folder,'data_normalized.txt'];
 
 %Points used to fit the linear function:
 linfitpoints=1:10;%setdiff([1:30],[1,5,4,23,30]);
@@ -128,19 +133,29 @@ plot(x_fit,fun(paramstoplot(nplot,:),x_fit),'k-',...
     xs, ys(:,nplot),'k.');
 hold on
 
-%write fit data
+%write fit data and normalized data
 fid=fopen(output_fit,'w');
+fid2=fopen(output_data,'w');
 fprintf(fid,'wavelength');
+fprintf(fid2,'wavelength\tError');
 M=zeros(length(x_fit),length(names));
 for i=1:l
-    fprintf(fid,'\t%s',names{i});   
+    fprintf(fid,'\t%s',names{i});
+    fprintf(fid2,'\t%s\tError',names{i});   
     M(:,i)=fun(paramstoplot(i,:),x_fit)';
 end
 fprintf(fid,'\n');
 fclose(fid);
+fprintf(fid2,'\n');
+fclose(fid2);
 dlmwrite(output_fit,[x_fit',M],'-append','delimiter','\t','precision','%e');
 fprintf('Fit data written to %s\n',output_fit);
 
+M=zeros(length(xs),2*l);
+M(:,1:2:end)=ys;
+M(:,2:2:end)=yse;
+dlmwrite(output_data,[xs,xse,M],'-append','delimiter','\t','precision','%e');
+fprintf('Normalized exp. data written to %s\n',output_data);
 
 plotmatx=[xs-xse,xs+xse]';
 plotmaty=[ys(:,nplot),ys(:,nplot)]';
