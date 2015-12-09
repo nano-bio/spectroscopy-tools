@@ -1,7 +1,7 @@
 function Laserdaten_auswerten(nplot)
-folder='Z:\User\Josi\Messungen\C60He+ Spektroskopie\30.11.2015 Labbook ID 4129\';
+folder='F:\Laserdaten\new\';
 
-A=importdata([folder,'export.txt'],'\t',1);
+A=importdata([folder,'Bereich 3 fein ENERGIES_test.txt'],'\t',1);
 
 xs=A.data(:,1);
 xse=A.data(:,2);
@@ -24,9 +24,10 @@ end
 
 output_resonances=[folder,'resonances.txt'];
 output_fit=[folder,'fit_data.txt'];
+output_fitparams=[folder,'fit_parameters.txt'];
 
 %Points used to fit the linear function:
-linfitpoints=setdiff([1:30],[1,5,4,23,30]);
+linfitpoints=1:10;%setdiff([1:30],[1,5,4,23,30]);
 
 x_fit=linspace(min(xs),max(xs),100);
 
@@ -52,30 +53,33 @@ l=size(ys,2);
 
 paramstoplot0=zeros(l,5);
 paramstoplot=zeros(l,5);
+fitparams=zeros(l,11);
 
 for i=1:l
     
     [~,minind]=min(smooth(ys(:,i),10));
     x0(3)=xs(minind); %reset peak center start postion to the data minimum
-    if any(isnan(ys(:,i))) == 0
-        [x,R,~,CovB] = nlinfit(xs,ys(:,i),fun,x0,'Weights',1./yse(:,i));
         
-        err=2*sqrt(diag(CovB));
+    [x,R,~,CovB] = nlinfit(xs,ys(:,i),fun,x0,'Weights',1./yse(:,i));
+        
+    err=2*sqrt(diag(CovB));
+    
+    rsquared(i)=r2(ys(:,i),fun(x,xs),1./yse(:,i));
+    peak(i)=x(3);
+    w(i)=x(2);    
+    peakerr(i)=err(3);
+    
+    werr(i)=err(2);
+    
+    fitparams(i,1:2:end-1)=x;
+    fitparams(i,2:2:end-1)=err;
+    fitparams(i,end)=rsquared(i);
+    
+    fprintf('%i\tR² = %f\n',i,rsquared(i));
 
-        rsquared(i)=r2(ys(:,i),fun(x,xs),1./yse(:,i));
-        peak(i)=x(3);
-        w(i)=x(2);    
-        peakerr(i)=err(3);
-
-        werr(i)=err(2);
-
-        fprintf('%i\tR² = %f\n',i,rsquared(i));
-
-        paramstoplot0(i,:)=x0;
-        paramstoplot(i,:)=x;
-    else
-        fprintf('%i was not a number\n',i);
-    end
+    paramstoplot0(i,:)=x0;
+    paramstoplot(i,:)=x;
+    
 end
 
 %write output data
@@ -92,11 +96,20 @@ subplot(2,2,1)
 plot(1:l,peak,'k.',[(1:l);(1:l)],[peak-peakerr;peak+peakerr],'k-',1:0.1:l,polyval(p,1:0.1:l),'k--');
 set(gca,'ylim',[min(xs),max(xs)])
 
+
+%Resonances and peak widths
 fid=fopen(output_resonances,'w');
 fprintf(fid,'Cluster Size\tResonance Frequency\tError\tWidth\tError\n');
 fclose(fid);
 dlmwrite(output_resonances,[(1:l)',peak',peakerr',w',werr'],'-append','delimiter','\t','precision','%e');
 fprintf('Resonances written to %s\n',output_resonances);    
+
+%comlete list of fitting results
+fid=fopen(output_fitparams,'w');
+fprintf(fid,'Cluster Size\tConst Baseline\tError\tWidth\tError\tCenter\tError\tPeak Height\tError\tlin. Baseline\tError\tr squared\n');
+fclose(fid);
+dlmwrite(output_fitparams,[(1:l)',fitparams],'-append','delimiter','\t','precision','%e');
+fprintf('Complete list of fit parameters written to %s\n',output_fitparams);  
 
 subplot(2,2,2)
 plot(1:l,w,'k.',[(1:l);(1:l)],[w-werr;w+werr],'k-');
