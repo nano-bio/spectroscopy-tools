@@ -1,0 +1,29 @@
+Evaluation Procedure
+
+
+Laserdaten_auswerten.m
+
+Variables:
+xs = wavelength
+xse = wavelength error
+
+ys = traces for all C_60He_n
+yse = accompanying errors
+
+ysmax = Highest yield for each trace
+ysmin = Lowest yield for each trace
+
+names = Name for each Column
+
+x0 = fit starting values
+l = number of traces
+
+Procedure:
+1) Load data
+2) Determine highest and lowest yield of each trace
+3) Normalize each trace. For each trace, the lowest yield of the trace is subtracted and then it is divided by the difference between highest and lowest yield (value span of trace). This results in values between 0 and 1.
+4) Normalize each error trace by dividing all errors by the span of values for the trace (relative errors).
+5) Loop over all traces and... 
+	5a) Smooth data with a window of 1nm (default) - then get minimum for fit starting parameter.
+	5b) fit each one with the given function (typically Lorentzian). 
+	5c) calculate errors for the trace
