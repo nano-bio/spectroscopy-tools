@@ -3,17 +3,19 @@ function Laserdaten_auswerten(nplot)
 % details about the procedure. Change settings in the next section:
 %==========================================
 %plot the fit for C60(He)n
+
 if ~exist('nplot','var')
     nplot=20;
 end
 
 % folder to import and write data
-folder='Z:\Experiments\Clustof\C60He + Spektroskopie\ID 8\';
+folder='C:\Users\c7441156\Desktop\PhD\Auswertung\C60He_Spektroskopie\Bereich 2\';
 
 % filename here
-A=importdata([folder,'id8_export_traces.txt'],'\t',1);
+A=importdata([folder,'Bereich 2_ENERGIES.txt'],'\t',1);
 
 % output filenames here
+output_diary=[folder,'diary.txt'];
 output_resonances=[folder,'resonances.txt'];
 output_fit=[folder,'fit_data.txt'];
 output_fitparams=[folder,'fit_parameters.txt'];
@@ -21,11 +23,13 @@ output_data=[folder,'data_normalized.txt'];
 
 % Points used to fit the linear function that determines the shift / He
 % atom
-linfitpoints=1:10;%setdiff([1:30],[1,5,4,23,30]);
+linfitpoints=2:10;%setdiff([1:30],[1,5,4,23,30]);
 
 % fit guessing parameters
 sm_width = 1; % for guessing the fit starting wavelength, smooth over sm_width nm of data
 %==========================================
+
+diary(output_diary);
 
 % Load wavelengths
 xs=A.data(:,1);
@@ -140,6 +144,7 @@ subplot(2,2,1)
 plot(1:l,peak,'k.',[(1:l);(1:l)],[peak-peakerr;peak+peakerr],'k-',1:0.1:l,polyval(p,1:0.1:l),'k--');
 set(gca,'ylim',[min(xs),max(xs)])
 
+diary off
 
 %Resonances and peak widths
 fid=fopen(output_resonances,'w');
@@ -207,7 +212,6 @@ hold off
 
 %plot(xdata,ydata(:,3),'k.',xfun,fun(x,xfun),'r-');
 end
-
 
 
 function out=r2(y,ycalc,w)
