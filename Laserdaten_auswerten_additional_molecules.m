@@ -5,14 +5,14 @@ function Laserdaten_auswerten(nplot)
     %plot the fit for C60(He)n
 
     if ~exist('nplot','var')
-        nplot=20;
+        nplot=10;
     end
 
     % folder to import and write data
     folder='Z:\Experiments\Clustof\C60 Spektroskopie Isotope Project\Extraction Test with Oasch-Molecules\';
 
     % filename here
-    A=importdata([folder,'oaschloch_export_traces3.txt'],'\t',1);
+    A=importdata([folder,'oaschloch_export_traces_unscaled.txt'],'\t',1);
 
     % amount of different additions to C60He
     n_additions = 4;
@@ -26,10 +26,17 @@ function Laserdaten_auswerten(nplot)
 
     % Points used to fit the linear function that determines the shift / He
     % atom
-    linfitpoints=setdiff([2:32],[4,5]);
+    linfitpoints=setdiff([2:22],[3,5,6]);
 
     % fit guessing parameters
     sm_width = 1; % for guessing the fit starting wavelength, smooth over sm_width nm of data
+    
+        
+    % detail plot additon: select for which addition to plot all detail
+    % plots
+    jall = 3;
+    % select how many plot you want to have in a row
+    horizontalplots = 6;
     %==========================================
 
     diary(output_diary);
@@ -60,21 +67,28 @@ function Laserdaten_auswerten(nplot)
 
         % define a gaussian and a lorentzian with a linear baseline
         %fun_l=@(x,xd) x(1)+xd*x(5)+x(4)/pi*(x(2))./((xd-x(3)).^2+(x(2))^2); %lorentz
-        fun_l=@(x,xd) x(1)+x(4)/pi*(x(2))./((xd-x(3)).^2+(x(2))^2); %lorentz
-        fun_ll=@(x,xd) x(1)+x(4)/pi*(x(2))./((xd-x(3)).^2+(x(2))^2) + x(7)/pi*(x(5))./((xd-x(6)).^2+(x(5))^2); %2 lorentz
+        fun_l=@(x,xd) x(1)+x(4)/pi*(x(2))./((xd-x(3)).^2+(x(2))^2); %lorentzian
+        fun_ll=@(x,xd) x(1)+x(4)/pi*(x(2))./((xd-x(3)).^2+(x(2))^2) + x(7)/pi*(x(5))./((xd-x(6)).^2+(x(5))^2); % 2 lorentzians
         fun_g=@(x,xd) x(1)+xd*x(5)+x(4)*normpdf(xd,x(3),abs(x(2))); %gauss
 
         % select which one to use
-        fun=fun_l;
+        fun=fun_ll;
+        % set this to the number of functions (gaussians / lorentzians)
+        numoffun = 2;
 
         % Default values for the fit guessing
         x0{j}(1)=0.8; %constant Baseline
         x0{j}(2)=0.4; %width 1
         x0{j}(3)=median(xs); %center 1
         x0{j}(4)=-0.5; %peak height 1
-        %x0{j}(5)=0.4; %width 2
-        %x0{j}(6)=median(xs); %center 2
-        %x0{j}(7)=0.5; %peak height 2
+        
+        % for 2 lorentzians
+        if numoffun==2
+            x0{j}(5)=0.4; %width 2
+            x0{j}(6)=median(xs); %center 2
+            x0{j}(7)=0.5; %peak height 2
+        end
+
         %x0(5)=0; %linear part of baseline
 
         %fit curves
@@ -82,15 +96,23 @@ function Laserdaten_auswerten(nplot)
         peakerr{j}=0;
         w{j}=0;
         wkerr{j}=0;
+        
+        % in case we use the double lorentzian
+        if numoffun==2
+            peak2{j}=0;
+            peakerr2{j}=0;
+            w2{j}=0;
+            wkerr2{j}=0;
+        end
         rsquared{j}=0;
 
         % number of traces to fit
         l{j}=size(ys{j},2);
 
         % prepare matrices to store fit data
-        paramstoplot0{j}=zeros(l{j},4);
-        paramstoplot{j}=zeros(l{j},4);
-        fitparams{j}=zeros(l{j},9);
+        paramstoplot0{j}=zeros(l{j},1+3*numoffun);
+        paramstoplot{j}=zeros(l{j},1+3*numoffun);
+        fitparams{j}=zeros(l{j},(1+3*numoffun)*2+1);
 
         % Loop through all traces
         for i=1:l{j}
@@ -104,6 +126,19 @@ function Laserdaten_auswerten(nplot)
 
             % hard coded initial height for the lorentz/gauss
             x0{j}(4) = -0.5;
+            
+            % now the same for the optional second function
+            if numoffun==2
+                % here we use the maximum instead, since we want to upwards
+                % peaks
+                [~,maxind]=max(smooth(xs, ys{j}(:,i),sm_width));
+
+                % select the appropriate x-value
+                x0{j}(6)=xs(maxind); %reset peak center start postion to the data minimum
+
+                % hard coded initial POSITIVE height for the lorentz/gauss
+                x0{j}(7) = 0.5;
+            end
 
             % Activate this if you want different starting parameters for a certain
             % range - used for the increase for He_n < 22 in some measurements
@@ -127,6 +162,13 @@ function Laserdaten_auswerten(nplot)
             w{j}(i)=x{j}(2);    
             peakerr{j}(i)=err{j}(3);
             werr{j}(i)=err{j}(2);
+            
+            if numoffun==2
+                peak2{j}(i)=x{j}(6);
+                w2{j}(i)=x{j}(5);    
+                peakerr2{j}(i)=err{j}(6);
+                werr2{j}(i)=err{j}(5);
+            end
 
             fitparams{j}(i,1:2:end-1)=x{j};
             fitparams{j}(i,2:2:end-1)=err{j};
@@ -151,10 +193,15 @@ function Laserdaten_auswerten(nplot)
         fprintf('Slope: %f+-%f nm/He\n',p{j}(1),perr{j}(1));
         fprintf('Offset: %f+-%f nm\n',p{j}(2),perr{j}(2));
 
-        subplot(n_additions,3,3*(j-1)+1)
+        subplot(n_additions,numoffun*2+1,(numoffun*2+1)*(j-1)+1)
         plot(1:l{j},peak{j},'k.',[(1:l{j});(1:l{j})],[peak{j}-peakerr{j};peak{j}+peakerr{j}],'k-',1:0.1:l{j},polyval(p{j},1:0.1:l{j}),'k--');
         set(gca,'ylim',[min(xs),max(xs)])
         title(['WL/nHe: ', names{j}{1}])
+        
+        subplot(n_additions,numoffun*2+1,(numoffun*2+1)*(j-1)+3)
+        plot(1:l{j},peak2{j},'k.',[(1:l{j});(1:l{j})],[peak2{j}-peakerr2{j};peak2{j}+peakerr2{j}],'k-',1:0.1:l{j},polyval(p{j},1:0.1:l{j}),'k--');
+        set(gca,'ylim',[min(xs),max(xs)])
+        title(['Inc. WL/nHe: ', names{j}{1}])
     end
 
     diary off
@@ -176,11 +223,17 @@ function Laserdaten_auswerten(nplot)
         dlmwrite(fn,[(1:l{j})',fitparams{j}],'-append','delimiter','\t','precision','%e');
         fprintf('Complete list of fit parameters written to %s\n',fn);
 
-        subplot(n_additions,3,3*(j-1)+2)
+        subplot(n_additions,numoffun*2+1,(numoffun*2+1)*(j-1)+2)
         plot(1:l{j},w{j},'k.',[(1:l{j});(1:l{j})],[w{j}-werr{j};w{j}+werr{j}],'k-');
+        set(gca,'ylim',[-1*median(w{j})*2,median(w{j})*4])
         title(['Peak Width/nHe: ', names{j}{1}])
+        
+        subplot(n_additions,numoffun*2+1,(numoffun*2+1)*(j-1)+4)
+        plot(1:l{j},w2{j},'k.',[(1:l{j});(1:l{j})],[w2{j}-werr2{j};w2{j}+werr2{j}],'k-');
+        set(gca,'ylim',[-1*median(w2{j})*4,median(w2{j})*6])
+        title(['Inc. Peak Width/nHe: ', names{j}{1}])
 
-        subplot(n_additions,3,3*(j-1)+3)
+        subplot(n_additions,5,5*(j-1)+5)
         %[xs,ys,xse,yse]=approx_data(xdata,ydata(:,nplot),deltax);
 
         hold off
@@ -188,7 +241,8 @@ function Laserdaten_auswerten(nplot)
         plot(x_fit,fun(paramstoplot{j}(nplot,:),x_fit),'k-',...
             x_fit,fun(paramstoplot0{j}(nplot,:),x_fit),'g--',...
             xs, ys{j}(:,nplot),'k.');
-        hold on
+        set(gca,'xlim',[min(xs),max(xs)]);
+        hold on    
 
         %write fit data and normalized data
         fn = [output_fit, '_', num2str(j), '.txt'];
@@ -225,6 +279,24 @@ function Laserdaten_auswerten(nplot)
         plot(plotmatx{j},plotmaty{j},'k-');
         title(['Signal/WL for n=',num2str(nplot),' of ' names{j}{1}])
         hold off
+    end
+    tightfig;
+    
+    % all detail plots for one addition
+    if jall~=0
+        firstplot = gcf;
+        secondplot = figure;
+        verticalplots = ceil(l{jall}/horizontalplots);
+        for g=1:l{jall}
+            subplot(verticalplots, horizontalplots, g)
+            hold off
+            plot(x_fit,fun(paramstoplot{jall}(g,:),x_fit),'k-',...
+                x_fit,fun(paramstoplot0{jall}(g,:),x_fit),'g--',...
+                xs, ys{jall}(:,g),'k.');
+            set(gca,'xlim',[min(xs),max(xs)]);
+            hold on
+        end
+        tightfig;
     end
 
 %plot(xdata,ydata(:,3),'k.',xfun,fun(x,xfun),'r-');
