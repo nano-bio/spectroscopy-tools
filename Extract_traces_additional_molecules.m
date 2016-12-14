@@ -9,7 +9,7 @@
 addpath('Z:\User\Josi\IsotopeFit\');
 
 %folder
-folder='Z:\Experiments\Clustof\C60 Spektroskopie Isotope Project\Extraction Test with Oasch-Molecules\';
+folder='Z:\Experiments\Clustof\C60 Spektroskopie Isotope Project\Final Results\';
 
 %IFD files:
 IFD_file=[];
@@ -27,7 +27,7 @@ lambda_file{1}=[folder,'lambda.txt'];
 %lambda_file{2}=[folder,'Bereich 3 Abschnitt 2 fein 960nm - Wellenlaengen.txt'];
 
 %Export filename
-scan_filename=[folder,'oaschloch_export_traces2.txt'];
+scan_filename=[folder,'export_traces_unscaled.txt'];
 
 %List of molecules:
 n_He=100; %number of C60-Helium traces to extract
@@ -36,9 +36,12 @@ n_He=100; %number of C60-Helium traces to extract
 % should be added
 additions = {'', '[Os]', '[Ot]', '[Ou]'};
 
+% scaling ot He series? set to 1 or 0
+scaling = 0;
+
 %-------------------- Evaluation PARAMETERS
 sr=1.5; %look sr sigma above/below the current molecule
-mindist=0.001; %in nm, the minimum distance where points are combined
+mindist=0.00001; %in nm, the minimum distance where points are combined
 
 %==========================================================================
 %======================= NOW THE MAGIC STARTS =============================
@@ -166,24 +169,20 @@ for i=1:length(eg); %go through all the energy groups
         small_ind=findmassrange2(ref_peakdata(:,1),IFD_data{1}.molecules(molecule_index(m)),R,0,sr);
         
         diff_ind=setdiff(scale_ind,small_ind);
-                
         
         %find the scaling factor
         %a=M(diff_ind,:)\ref_peakdata(diff_ind,2); %such that M*a is close to the reference spec in the msd sense
         
         % apply background correction
         %single_spec=M*a-pchip(bgm,bgy,ref_peakdata(:,1));
-%         
-%         if m==8
-%             plot(ref_peakdata(small_ind,1),single_spec(small_ind),'r.',ref_peakdata(diff_ind,1),single_spec(diff_ind),'k.');
-%             set(gca,'ylim',[0,2.5e5]);
-%             title(IFD_data{1}.molecules(molecule_index(m)).name)
-%             %pause(0.1)
-%             %sum(single_spec(small_ind));
-%         end
-        
-        output_data(i,(m+1)*2-1) = sum(single_spec(small_ind))/sum(single_spec(diff_ind));
-        output_data(i,(m+1)*2)   = sqrt(1/sum(single_spec(small_ind))+1/sum(single_spec(diff_ind)))*output_data(i,(m+1)*2-1);
+
+        if scaling==1
+            output_data(i,(m+1)*2-1) = sum(single_spec(small_ind))/sum(single_spec(diff_ind));
+            output_data(i,(m+1)*2)   = sqrt(1/sum(single_spec(small_ind))+1/sum(single_spec(diff_ind)))*output_data(i,(m+1)*2-1);
+        else
+            output_data(i,(m+1)*2-1) = sum(single_spec(small_ind));
+            output_data(i,(m+1)*2)   = sqrt(sum(single_spec(small_ind)));
+        end
         
         %output_data(i,(m+1)*2)   = output_data(i,(m+1)*2-1)/sqrt(sum(M(small_ind,3)));
     end
@@ -192,4 +191,3 @@ end
 fprintf('dlmwrite. please wait...');
     dlmwrite(scan_filename,output_data,'-append','delimiter','\t','precision','%e');
 fprintf(' done.\n');
-

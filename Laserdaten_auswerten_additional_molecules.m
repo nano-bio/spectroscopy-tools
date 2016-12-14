@@ -9,10 +9,10 @@ function Laserdaten_auswerten(nplot)
     end
 
     % folder to import and write data
-    folder='Z:\Experiments\Clustof\C60 Spektroskopie Isotope Project\Extraction Test with Oasch-Molecules\';
+    folder='Z:\Experiments\Clustof\C60 Spektroskopie Isotope Project\Final Results\';
 
     % filename here
-    A=importdata([folder,'oaschloch_export_traces_unscaled.txt'],'\t',1);
+    A=importdata([folder,'export_traces_scaled.txt'],'\t',1);
 
     % amount of different additions to C60He
     n_additions = 4;
@@ -34,7 +34,7 @@ function Laserdaten_auswerten(nplot)
         
     % detail plot additon: select for which addition to plot all detail
     % plots
-    jall = 3;
+    jall = 4;
     % select how many plot you want to have in a row
     horizontalplots = 6;
     %==========================================
